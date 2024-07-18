@@ -14,4 +14,6 @@ Tasks:
 4. Now you are required to add a new event, that is triggered at the same time as the first step. This new event executes a different workflow. This workflow runs the same step as task 2.
 5. Add a small tracing mechanism to allow us to track requests between the 2 different workflows. You do not need to use a third party app.
 
-
+Deliverables:
+1. Yaml files of all of the Kubernetes Objects you were required to create.
+2. Comments and notes explaining you thought process for the solution of the tasks.
