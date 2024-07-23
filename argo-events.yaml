@@ -1,0 +1,179 @@
+apiVersion: argoproj.io/v1alpha1
+kind: EventBus
+metadata:
+  name: default
+spec:
+  nats:
+    native:
+      replicas: 3
+      auth: token
+
+---
+
+apiVersion: argoproj.io/v1alpha1
+kind: EventSource
+metadata:
+  name: webhook
+spec:
+  service:
+    ports:
+      - port: 12000
+        targetPort: 12000
+  webhook:
+    exercise:
+      port: "12000"
+      endpoint: /exercise
+      method: POST
+
+---
+
+apiVersion: argoproj.io/v1alpha1
+kind: Sensor
+metadata:
+  name: webhook
+spec:
+  template:
+    serviceAccountName: operate-workflow-sa
+  dependencies:
+    - name: webhook-dep
+      eventSourceName: webhook
+      eventName: exercise
+  triggers:
+    - template:
+        name: argo-workflow-trigger
+        argoWorkflow:
+          operation: submit
+          source:
+            resource:
+              apiVersion: argoproj.io/v1alpha1
+              kind: Workflow
+              metadata:
+                generateName: my-trigger-
+              spec:
+                serviceAccountName: execute-workflow-sa
+                podGC:
+                  strategy: OnPodSuccess
+                entrypoint: my-steps
+                templateDefaults:
+                  inputs:
+                    parameters:
+                      - name: trace-id
+                        value: "{{workflow.parameters.trace-id}}"
+                arguments:
+                  parameters:
+                    - name: message
+                    - name: trace-id
+                templates:
+                  - name: my-steps
+                    steps:
+                      - - name: print-message
+                          template: print-message
+                          arguments:
+                            parameters:
+                              - name: message
+                                value: "{{workflow.parameters.message}}"
+                              - name: trace-id
+                                value: "{{workflow.parameters.trace-id}}"
+                      - - name: print-number-of-namespaces
+                          templateRef:
+                            name: webhook-workflow-template
+                            template: print-number-of-namespaces
+                      - - name: arbitrary-print-if-elden
+                          when: '"{{workflow.parameters.message}}" =~ "elden"'
+                          template: arbitrary-print
+                      - - name: arbitrary-print-if-not-elden
+                          when: '"{{workflow.parameters.message}}" !~ "elden"'
+                          template: arbitrary-print
+
+                  - name: print-message
+                    inputs:
+                      parameters:
+                        - name: message
+                        - name: trace-id
+                    script:
+                      image: alpine:latest
+                      command: [sh]
+                      source: |
+                        echo {{inputs.parameters.message}} | tee /tmp/message
+                    outputs:
+                      parameters:
+                        - name: message
+                          valueFrom:
+                            path: /tmp/message
+                  - name: arbitrary-print
+                    script:
+                      image: python:3.12-alpine
+                      command: [python]
+                      source: |
+                        import random
+                        print(random.randint(1, 2))
+          parameters:
+            - src:
+                dependencyName: webhook-dep
+                dataKey: body.message
+              dest: spec.arguments.parameters.0.value
+            - src:
+                dependencyName: webhook-dep
+                contextKey: id
+              dest: spec.arguments.parameters.1.value
+
+---
+
+apiVersion: argoproj.io/v1alpha1
+kind: Sensor
+metadata:
+  name: webhook2
+spec:
+  template:
+    serviceAccountName: operate-workflow-sa
+  dependencies:
+    - name: webhook-dep
+      eventSourceName: webhook
+      eventName: exercise
+  triggers:
+    - template:
+        name: argo-workflow-another-trigger
+        argoWorkflow:
+          operation: submit
+          source:
+            resource:
+              apiVersion: argoproj.io/v1alpha1
+              kind: Workflow
+              metadata:
+                generateName: my-other-trigger-
+              spec:
+                serviceAccountName: execute-workflow-sa
+                podGC:
+                  strategy: OnPodSuccess
+                  deleteDelayDuration: 1h
+
+                entrypoint: my-steps
+                templateDefaults:
+                  inputs:
+                    parameters:
+                      - name: trace-id
+                        value: "{{workflow.parameters.trace-id}}"
+                arguments:
+                  parameters:
+                    - name: message
+                    - name: trace-id
+                templates:
+                  - name: my-steps
+                    steps:
+                      - - name: print-number-of-namespaces
+                          templateRef:
+                            name: webhook-workflow-template
+                            template: print-number-of-namespaces
+                          arguments:
+                            parameters:
+                              - name: trace-id
+                                value: "{{workflow.parameters.trace-id}}"
+          parameters:
+            - src:
+                dependencyName: webhook-dep
+                dataKey: body.message
+              dest: spec.arguments.parameters.0.value
+            - src:
+                dependencyName: webhook-dep
+                contextKey: id
+              dest: spec.arguments.parameters.1.value

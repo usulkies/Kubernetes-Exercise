@@ -1,0 +1,20 @@
+apiVersion: argoproj.io/v1alpha1
+kind: WorkflowTemplate
+metadata:
+  name: webhook-workflow-template
+spec:
+  templates:
+    - name: print-number-of-namespaces
+      inputs:
+        parameters:
+          - name: trace-id
+      script:
+        image: bitnami/kubectl:latest
+        command: [ bash ]
+        source: |
+          echo 'Number of namespaces: '
+          num_namespaces=$(kubectl get ns | wc -l)
+          num_namespaces=$((num_namespaces - 1))
+          echo "$num_namespaces"
+---
+
