@@ -1,3 +1,7 @@
+# In this file there are a few RBAC objects to be used by the sensor and by the workflow.
+# The sensor uses the operate-workflow-sa service account, which has a role that allows it to operate on workflows.
+# The workflow uses the execute-workflow-sa service account, which has a role that allows it to get, list, watch, and patch namespaces and pods.
+
 apiVersion: v1
 kind: ServiceAccount
 metadata:
@@ -50,7 +54,6 @@ rules:
       - "patch"
     resources:
       - namespaces
-      - pods
 ---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRoleBinding

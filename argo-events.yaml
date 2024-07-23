@@ -1,3 +1,14 @@
+# For the solution, we need to create a default EventBus, and one EventSource.
+# I chose to use webhook as the EventSource, and created two Sensors that trigger two different Workflows.
+# The first EventSource with its first two steps is for paragraphs 1-2 in the exercise.
+# I then solved no. 3 using a when expression with regex match.
+# For no. 4 - I extracted the mutual step to a workflow template (workflow-template.yaml) and used it in both Sensors.
+# For no. 5 - I decided to use the event id from the event context, since it's created uniquely for each event.
+# I pass the event id as a trace-id parameter to the Workflow and into each step and template.
+# From the input parameter it could be injected as an environment variable if we wish to expose it to the script or the called app.
+# We could also add it as a label to the pod, or use it in any other way we see fit to make it appear in all relevant logs.
+
+
 apiVersion: argoproj.io/v1alpha1
 kind: EventBus
 metadata:
@@ -78,6 +89,10 @@ spec:
                           templateRef:
                             name: webhook-workflow-template
                             template: print-number-of-namespaces
+                          arguments:
+                            parameters:
+                              - name: trace-id
+                                value: "{{workflow.parameters.trace-id}}"
                       - - name: arbitrary-print-if-elden
                           when: '"{{workflow.parameters.message}}" =~ "elden"'
                           template: arbitrary-print
